@@ -15,3 +15,7 @@ desktop.ini
 # Temp
 *.tmp
 ~$*
+
+# Node.js
+node_modules/
+package-lock.json
