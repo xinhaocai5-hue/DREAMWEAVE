@@ -646,10 +646,10 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
         saveThemes: (themes) => StorageService.saveSettings({ ...StorageService.getSettings(), themes }),
         getSplashConfig: () => { try { return JSON.parse(localStorage.getItem(KEYS.SPLASH)) || DEFAULT_SPLASH_CONFIG; } catch { return DEFAULT_SPLASH_CONFIG; } },
         saveSplashConfig: (config) => { localStorage.setItem(KEYS.SPLASH, JSON.stringify(config)); },
-        downloadJSON: (data, filename) => { const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url); },
+        downloadJSON: (data, filename) => { const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(() => URL.revokeObjectURL(url), 1000); },
         getFullBackupData: async (projects, characters, backgrounds) => { const settingsStr = localStorage.getItem(KEYS.SETTINGS); let settings = settingsStr ? JSON.parse(settingsStr) : {}; if (settings.apiConfigs && Array.isArray(settings.apiConfigs)) { settings.apiConfigs = settings.apiConfigs.map(config => ({ ...config, apiKey: "" })); } const splash = localStorage.getItem(KEYS.SPLASH); return { version: 4, projects, characters, backgrounds, settings: settings, splash: splash ? JSON.parse(splash) : null }; },
         getProjectExportData: (project, allCharacters, allBackgrounds) => { const usedCharIds = new Set(); const usedBgIds = new Set(); project.scripts.forEach(line => { if (line.characterId) usedCharIds.add(line.characterId); if (line.stageCharacters) { line.stageCharacters.forEach(sc => usedCharIds.add(sc.charId)); } if (line.backgroundId) usedBgIds.add(line.backgroundId); }); const usedCharacters = allCharacters.filter(c => usedCharIds.has(c.id)); const usedBackgrounds = allBackgrounds.filter(b => usedBgIds.has(b.id)); return { ...project, characters: usedCharacters, backgrounds: usedBackgrounds }; },
-        createDataCard: async (data, coverImageFile, filenamePrefix) => { const jsonString = JSON.stringify(data); let imageBlob = coverImageFile; if (!imageBlob) { const canvas = document.createElement('canvas'); canvas.width = 800; canvas.height = 450; const ctx = canvas.getContext('2d'); const grd = ctx.createLinearGradient(0, 0, 800, 450); grd.addColorStop(0, "#1f2937"); grd.addColorStop(1, "#111827"); ctx.fillStyle = grd; ctx.fillRect(0,0,800,450); ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(400, 225, 300, 0, 2*Math.PI); ctx.stroke(); ctx.fillStyle = '#ffffff'; ctx.font = 'bold 40px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('DreamWeave VN Data', 400, 200); ctx.font = '20px sans-serif'; ctx.fillStyle = '#9ca3af'; let subText = "Data Card"; if(data.projects && Array.isArray(data.projects)) subText = `Full Backup (${data.projects.length} projects)`; else if(data.scripts) subText = `Project: ${data.name}`; else if(data.name && data.avatar) subText = `Character: ${data.name}`; else if(Array.isArray(data) && data[0]?.name) subText = `Character Batch (${data.length})`; ctx.fillText(subText, 400, 250); ctx.fillText(new Date().toISOString().slice(0,10), 400, 300); imageBlob = await new Promise(r => canvas.toBlob(r, 'image/png')); } const finalBlob = new Blob([imageBlob, DATA_SEPARATOR, jsonString], { type: 'image/png' }); const url = URL.createObjectURL(finalBlob); const a = document.createElement('a'); a.href = url; a.download = `${filenamePrefix}_${new Date().toISOString().slice(0,10)}.png`; a.click(); URL.revokeObjectURL(url); },
+        createDataCard: async (data, coverImageFile, filenamePrefix) => { const jsonString = JSON.stringify(data); let imageBlob = coverImageFile; if (!imageBlob) { const canvas = document.createElement('canvas'); canvas.width = 800; canvas.height = 450; const ctx = canvas.getContext('2d'); const grd = ctx.createLinearGradient(0, 0, 800, 450); grd.addColorStop(0, "#1f2937"); grd.addColorStop(1, "#111827"); ctx.fillStyle = grd; ctx.fillRect(0,0,800,450); ctx.strokeStyle = "rgba(255,255,255,0.1)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(400, 225, 300, 0, 2*Math.PI); ctx.stroke(); ctx.fillStyle = '#ffffff'; ctx.font = 'bold 40px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('DreamWeave VN Data', 400, 200); ctx.font = '20px sans-serif'; ctx.fillStyle = '#9ca3af'; let subText = "Data Card"; if(data.projects && Array.isArray(data.projects)) subText = `Full Backup (${data.projects.length} projects)`; else if(data.scripts) subText = `Project: ${data.name}`; else if(data.name && data.avatar) subText = `Character: ${data.name}`; else if(Array.isArray(data) && data[0]?.name) subText = `Character Batch (${data.length})`; ctx.fillText(subText, 400, 250); ctx.fillText(new Date().toISOString().slice(0,10), 400, 300); imageBlob = await new Promise(r => canvas.toBlob(r, 'image/png')); } const finalBlob = new Blob([imageBlob, DATA_SEPARATOR, jsonString], { type: 'image/png' }); const url = URL.createObjectURL(finalBlob); const a = document.createElement('a'); a.href = url; a.download = `${filenamePrefix}_${new Date().toISOString().slice(0,10)}.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(() => URL.revokeObjectURL(url), 1000); },
         importData: (file) => new Promise((resolve) => { const parseJsonData = (jsonStr) => { try { const json = JSON.parse(jsonStr); if (json.version >= 2 && json.projects && json.characters) return { type: 'BACKUP_V2', data: json, success: true }; if (json.version === 1 && json.projects) return { type: 'BACKUP', data: json, success: true }; if (json.scripts && json.characters) return { type: 'PROJECT', data: json, success: true }; if (json.name && (json.avatar || json.sprites)) return { type: 'CHARACTER', data: json, success: true }; if (Array.isArray(json) && json[0]?.name && json[0]?.sprites) return { type: 'CHARACTERS_BATCH', data: json, success: true }; return { type: 'UNKNOWN', data: null, success: false }; } catch (err) { return { type: 'ERROR', data: null, success: false }; } }; if (file.type.startsWith('image/')) { const reader = new FileReader(); reader.onload = (e) => { const text = e.target.result; if (text.includes(DATA_SEPARATOR)) { const parts = text.split(DATA_SEPARATOR); const jsonStr = parts[parts.length - 1]; resolve(parseJsonData(jsonStr)); } else { resolve({ type: 'ERROR', data: null, success: false, message: '图片中未找到有效数据' }); } }; reader.readAsText(file); return; } const reader = new FileReader(); reader.onload = (e) => { resolve(parseJsonData(e.target?.result)); }; reader.readAsText(file); }),
         clearAllData: () => { if(confirm("警告：此操作将清空所有项目、角色和设置，且无法恢复！\n请确保已导出备份。\n确认清空？")) { const req = indexedDB.deleteDatabase(IDB_CONFIG.DB_NAME); req.onsuccess = () => { localStorage.clear(); CacheManager.invalidateAll(); alert("数据已清空，页面将刷新。"); window.location.reload(); }; req.onerror = () => alert("清空失败，请重试"); } }
       };
@@ -1642,8 +1642,8 @@ Remember: Start with quality tags, then describe the environment in detail. Outp
           const [mode, setMode] = useState('image'); 
           const [coverImage, setCoverImage] = useState(null);
           if (!isOpen) return null;
-          const handleExportJSON = () => { StorageService.downloadJSON(data, `${filenamePrefix}.json`); onClose(); };
-          const handleExportImage = async () => { let coverBlob = null; if (coverImage) { const res = await fetch(coverImage); coverBlob = await res.blob(); } await StorageService.createDataCard(data, coverBlob, filenamePrefix); onClose(); };
+          const handleExportJSON = () => { try { StorageService.downloadJSON(data, `${filenamePrefix}.json`); onClose(); } catch(err) { console.error('[导出JSON失败]', err); alert('导出失败: ' + (err.message || err)); } };
+          const handleExportImage = async () => { try { let coverBlob = null; if (coverImage) { const res = await fetch(coverImage); coverBlob = await res.blob(); } await StorageService.createDataCard(data, coverBlob, filenamePrefix); onClose(); } catch(err) { console.error('[导出图片失败]', err); alert('导出失败: ' + (err.message || err) + '\n\n如果数据量较大，请尝试使用 JSON 格式导出。'); } };
           return (
               <Modal isOpen={isOpen} onClose={onClose} title="导出数据" size="2xl">
                   <div className="flex flex-col gap-6">
@@ -9359,6 +9359,7 @@ ${result.scripts.map((s, i) => `${i + 1}. ${s.characterId ? result.characters.fi
         const [showDevConsole, setShowDevConsole] = useState(false); // 开发者控制台
         const [charManagerInitialId, setCharManagerInitialId] = useState(null); // 角色管理中心初始选中角色
         const fileInputRef = useRef(null);
+        const historyOkRef = useRef(true);
         const [isDragOverImport, setIsDragOverImport] = useState(false);
         const [tappedCardId, setTappedCardId] = useState(null);
         const isDesktop = useMediaQuery('(min-width: 768px)');
@@ -9367,41 +9368,41 @@ ${result.scripts.map((s, i) => `${i + 1}. ${s.characterId ? result.characters.fi
 
         const navigateToMode = (newMode) => {
             setShowSettings(false); 
-            window.history.pushState({ mode: newMode, editorTab: 'SCRIPT' }, '');
+            try { window.history.pushState({ mode: newMode, editorTab: 'SCRIPT' }, ''); historyOkRef.current = true; } catch(e) { historyOkRef.current = false; }
             setMode(newMode);
             if (newMode === 'EDITOR') setCurrentEditorTab('SCRIPT');
         };
 
         const navigateBack = () => {
-            window.history.back();
+            if (historyOkRef.current) { window.history.back(); } else { setMode('HOME'); setShowSettings(false); setShowGenerator(false); setExportModalState(prev => ({ ...prev, isOpen: false })); }
         };
 
         const openModal = (modalName, openFn) => {
             const newState = { mode, modal: modalName };
-            window.history.pushState(newState, '');
+            try { window.history.pushState(newState, ''); historyOkRef.current = true; } catch(e) { historyOkRef.current = false; }
             openFn(true);
         };
 
         const closeModal = (closeFn) => {
-            window.history.back(); 
+            if (historyOkRef.current) { window.history.back(); } else { setShowSettings(false); setShowGenerator(false); setExportModalState(prev => ({ ...prev, isOpen: false })); }
         };
 
         const changeEditorTab = (newTab) => {
             if (currentEditorTab === newTab) return;
-            if (newTab === 'SCRIPT') { if (currentEditorTab !== 'SCRIPT') window.history.back(); } 
-            else { if (currentEditorTab === 'SCRIPT') window.history.pushState({ mode: 'EDITOR', editorTab: newTab }, ''); else window.history.replaceState({ mode: 'EDITOR', editorTab: newTab }, ''); setCurrentEditorTab(newTab); }
+            if (newTab === 'SCRIPT') { if (currentEditorTab !== 'SCRIPT') { if (historyOkRef.current) window.history.back(); else setCurrentEditorTab('SCRIPT'); } } 
+            else { if (currentEditorTab === 'SCRIPT') { try { window.history.pushState({ mode: 'EDITOR', editorTab: newTab }, ''); } catch(e) {} } else { try { window.history.replaceState({ mode: 'EDITOR', editorTab: newTab }, ''); } catch(e) {} } setCurrentEditorTab(newTab); }
         };
 
         const changeSettingsTab = (newTab) => {
             if (settingsTab === newTab) return;
             if (newTab === 'ROOT') {
-                window.history.back();
+                if (historyOkRef.current) window.history.back(); else setSettingsTab('ROOT');
             } else {
                 if (settingsTab === 'ROOT') {
-                    window.history.pushState({ mode, modal: 'SETTINGS', settingsTab: newTab }, '');
+                    try { window.history.pushState({ mode, modal: 'SETTINGS', settingsTab: newTab }, ''); } catch(e) {}
                     setSettingsTab(newTab);
                 } else {
-                    window.history.replaceState({ mode, modal: 'SETTINGS', settingsTab: newTab }, '');
+                    try { window.history.replaceState({ mode, modal: 'SETTINGS', settingsTab: newTab }, ''); } catch(e) {}
                     setSettingsTab(newTab);
                 }
             }
@@ -9410,13 +9411,13 @@ ${result.scripts.map((s, i) => `${i + 1}. ${s.characterId ? result.characters.fi
         const handleSettingsOpen = (tab = 'ROOT') => {
             const newState = { mode, modal: 'SETTINGS' };
             if (tab !== 'ROOT') newState.settingsTab = tab;
-            window.history.pushState(newState, '');
+            try { window.history.pushState(newState, ''); historyOkRef.current = true; } catch(e) { historyOkRef.current = false; }
             setSettingsTab(tab);
             setShowSettings(true);
         };
 
         useEffect(() => {
-            if (!window.history.state) window.history.replaceState({ mode: 'HOME' }, '');
+            if (!window.history.state) { try { window.history.replaceState({ mode: 'HOME' }, ''); } catch(e) { historyOkRef.current = false; } }
             const handlePopState = (event) => {
                 const state = event.state || { mode: 'HOME' };
                 
@@ -9622,7 +9623,7 @@ ${result.scripts.map((s, i) => `${i + 1}. ${s.characterId ? result.characters.fi
         const handleSettingsClose = () => closeModal();
         const handleGeneratorOpen = () => openModal('GENERATOR', setShowGenerator);
         const handleGeneratorClose = () => closeModal();
-        const handleExportAll = async () => { const fullData = await StorageService.getFullBackupData(projects, characters, backgrounds); setExportModalState({ isOpen: true, data: fullData, filenamePrefix: 'vn_maker_full_backup' }); openModal('EXPORT', () => {}); };
+        const handleExportAll = async () => { try { const fullData = await StorageService.getFullBackupData(projects, characters, backgrounds); setExportModalState({ isOpen: true, data: fullData, filenamePrefix: 'vn_maker_full_backup' }); openModal('EXPORT', () => {}); } catch(err) { console.error('[备份失败]', err); alert('备份数据失败: ' + (err.message || err)); } };
         const handleExportProject = (p) => { const data = StorageService.getProjectExportData(p, characters, backgrounds); setExportModalState({ isOpen: true, data: data, filenamePrefix: `${p.name}_export` }); openModal('EXPORT', () => {}); };
         const handleExportModalClose = () => closeModal(); 
         const openExportModalWrapper = (data, prefix) => { setExportModalState({ isOpen: true, data, filenamePrefix: prefix }); openModal('EXPORT', () => {}); };
